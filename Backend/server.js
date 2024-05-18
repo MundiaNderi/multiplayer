@@ -2,8 +2,14 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
+const cors = require('cors');
 
 const app = express();
+app.use(express.json());
+app.use(cors());
+
+
+
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
@@ -95,7 +101,13 @@ const calculateWinner = (squares) => {
   }
   return null;
 };
+// post the winner 
 
+app.post('/calculate-winner', (req, res) => {
+    const { squares } = req.body;
+    const winner = calculateWinner(squares);
+    res.send({ winner})
+})
 const resetGame = () => {
   gameState = {
     history: [{ squares: Array(9).fill(null) }],

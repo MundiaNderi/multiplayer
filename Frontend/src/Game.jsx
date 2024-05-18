@@ -5,7 +5,6 @@ import W3CWebSocket from 'websocket/lib/W3CWebSocket'
 
 const client = new W3CWebSocket('ws://localhost:8080');
 
-
 export default function Game() {
     const [xIsNext, setXIsNext] = useState(true)
     const [history, setHistory] = useState([Array(9).fill(null)])
@@ -61,14 +60,14 @@ export default function Game() {
             }
         };
 
-        return () => client.close();
+        return () => client.close()
 
     }, [])
 
     return (
         <div className="game">
             <div className="game-board">
-                <Board xIsNext={xIsNext} sqaures={currentSquares} onPlay={handlePlay} />
+                <Board xIsNext={xIsNext} squares={currentSquares} onPlay={handlePlay} />
             </div>
             <div className="game-info">
                 <ol>{moves}</ol>

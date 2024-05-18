@@ -1,4 +1,7 @@
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { w3cwebsocket as W3CWebSocket } from 'websocket';
+
+const client = new W3CWebSocket('ws://localhost:8080');
 
 function Square({ value, onSquareClick }) {
   return (
@@ -9,8 +12,38 @@ function Square({ value, onSquareClick }) {
 }
 
 function Board({ xIsNext, squares, onPlay }) {
+  const [status, setStatus] = useState('Next player: ' + (xIsNext ? 'X' : 'O'));
+
+  useEffect(() => {
+    const calculateWinner = async (squares) => {
+      try {
+        const response = await fetch('http://localhost:8080/calculate-winner', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ squares }),
+        });
+        const data = await response.json();
+        return data.winner;
+      } catch (error) {
+        console.error('Error calculating winner:', error);
+        return null;
+      }
+    };
+
+    const updateStatus = async () => {
+      const winner = await calculateWinner(squares);
+      if (winner) {
+        setStatus('Winner: ' + winner);
+      } else {
+        setStatus('Next player: ' + (xIsNext ? 'X' : 'O'));
+      }
+    };
+
+    updateStatus();
+  }, [squares, xIsNext]);
+
   function handleClick(i) {
-    if (calculateWinner(squares) || squares[i]) {
+    if (squares[i]) {
       return;
     }
     const nextSquares = squares.slice();
@@ -20,14 +53,6 @@ function Board({ xIsNext, squares, onPlay }) {
       nextSquares[i] = 'O';
     }
     onPlay(nextSquares);
-  }
-
-  const winner = calculateWinner(squares);
-  let status;
-  if (winner) {
-    status = 'Winner: ' + winner;
-  } else {
-    status = 'Next player: ' + (xIsNext ? 'X' : 'O');
   }
 
   return (
@@ -53,17 +78,19 @@ function Board({ xIsNext, squares, onPlay }) {
 }
 
 export default function Game() {
-  const [xIsNext, setXIsNext] = useState(true);
   const [history, setHistory] = useState([Array(9).fill(null)]);
-  const currentSquares = history[history.length - 1];
+  const [currentMove, setCurrentMove] = useState(0);
+  const xIsNext = currentMove % 2 === 0;
+  const currentSquares = history[currentMove];
 
   function handlePlay(nextSquares) {
-    setHistory([...history, nextSquares]);
-    setXIsNext(!xIsNext);
+    const nextHistory = [...history.slice(0, currentMove + 1), nextSquares];
+    setHistory(nextHistory);
+    setCurrentMove(nextHistory.length - 1);
   }
 
   function jumpTo(nextMove) {
-    // TODO
+    setCurrentMove(nextMove);
   }
 
   const moves = history.map((squares, move) => {
@@ -79,6 +106,30 @@ export default function Game() {
       </li>
     );
   });
+
+  useEffect(() => {
+    client.onopen = () => {
+      console.log('WebSocket client connected');
+    };
+
+    client.onmessage = (message) => {
+      const data = JSON.parse(message.data);
+      if (data.type === 'init') {
+        console.log(`Player ${data.player} connected`);
+      } else if (data.type === 'update') {
+        setHistory(data.history);
+        setCurrentMove(data.stepNumber);
+      } else if (data.type === 'status') {
+        console.log(data.status);
+      }
+    };
+
+    client.onclose = () => {
+      console.log('WebSocket client disconnected');
+    };
+
+    return () => client.close();
+  }, []);
 
   return (
     <div className="game">
