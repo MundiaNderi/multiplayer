@@ -1,0 +1,78 @@
+import React, { useEffect, useState } from 'react'
+import Board from './App'
+import { w3cwebsocket } from 'websocket'
+import W3CWebSocket from 'websocket/lib/W3CWebSocket'
+
+const client = new W3CWebSocket('ws://localhost:8080');
+
+
+export default function Game() {
+    const [xIsNext, setXIsNext] = useState(true)
+    const [history, setHistory] = useState([Array(9).fill(null)])
+    const[currentMove, setCurrentMove] = useState(0);
+    const currentSquares = history[currentMove];
+    const [player, setPlayer] = useState(null)
+    const [status, setStatus] = useState('Waiting for another player')
+
+    function handlePlay(nextSquares) {
+        const nextHistory = [...history.slice(0, currentMove + 1), nextSquares]
+        setHistory(nextHistory)
+        setCurrentMove(nextHistory.length - 1)
+        setXIsNext(!xIsNext);
+    }
+
+    function jumpTo(nextMove) {
+        setCurrentMove(nextMove)
+        //setXIsNext(nextMove % 2 === 0)
+     }
+
+
+    const moves = history.map((squares, move) => {
+        let description;
+
+        if (move > 0) {
+            description = 'Go to move #' + move;
+        } else {
+            description = 'Go to game start';
+        }
+        return (
+            <li key={move}>
+                <button onClick={() => jumpTo(move)}>{description}</button>
+            </li>
+        );
+
+
+    })
+
+    useEffect(() => {
+        client.onopen = () => {
+            console.log("Websocket client connected")
+        }
+        client.onmessage = (message) => {
+            const data = JSON.parse( message.data)
+            if(data.type === 'init') {
+                setPlayer(data.player)
+            } else if(data.type === 'update') {
+                setHistory(data.history)
+                setCurrentMove(data.currentMove)
+                setXIsNext(data.xIsNext)
+            } else if (data.type === 'status') {
+                setStatus(data.status)
+            }
+        };
+
+        return () => client.close();
+
+    }, [])
+
+    return (
+        <div className="game">
+            <div className="game-board">
+                <Board xIsNext={xIsNext} sqaures={currentSquares} onPlay={handlePlay} />
+            </div>
+            <div className="game-info">
+                <ol>{moves}</ol>
+            </div>
+        </div>
+    );
+}
